@@ -1,6 +1,6 @@
 def create_app():
 
-    from flask import Flask, current_app
+    from flask import Flask
 
     app = Flask(__name__, instance_relative_config=True)
 
@@ -41,5 +41,14 @@ def create_app():
 
     TranslateManager.get_instance().init_app(app)
     TranslateManager.get_instance().start()
+
+    import cloudinary
+
+    cloudinary.config(
+        cloud_name=app.config.get("CLOUD_NAME"),
+        api_key=app.config.get("API_KEY"),
+        api_secret=app.config.get("API_SECRET"),
+        secure=True,
+    )
 
     return app

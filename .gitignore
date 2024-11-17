@@ -2,3 +2,4 @@ VnCoreNLP
 modelWeights
 .venv
 __pycache__
+.env
