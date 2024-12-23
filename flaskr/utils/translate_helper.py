@@ -5,12 +5,13 @@ import threading
 import time
 import tensorflow as tf
 from flaskr.utils.model import (
-    preprocess_vi,
-    preprocess_ja,
-    transformer_javi,
-    transformer_vija,
-    ja_tokenizer,
-    vi_tokenizer,
+    preprocess_japanese_sentence,
+    preprocess_vietnamese_sentece,
+    tokenizers,
+    split_japanese_sentence,
+    split_vietnamese_sentence,
+    javi_transformer,
+    vija_transformer,
 )
 
 
@@ -104,89 +105,127 @@ class TranslateManager:
 
             match model:
                 case "javi":
-                    encoder_input = tf.expand_dims(
-                        tf.cast(
-                            ja_tokenizer(preprocess_ja(content))["input_ids"], tf.int64
-                        ),
-                        axis=0,
-                    )
-                    start_end = vi_tokenizer("")["input_ids"]
-                    start = tf.expand_dims(tf.cast(start_end[0], tf.int64), axis=0)
-                    end = tf.expand_dims(tf.cast(start_end[1], tf.int64), axis=0)
-                    output_array = tf.TensorArray(
-                        dtype=tf.int64, size=0, dynamic_size=True
-                    )
-                    output_array = output_array.write(0, start)
+                    sentences = split_japanese_sentence(content)
 
-                    self.__socket.emit(
-                        "translate",
-                        vi_tokenizer.decode(start.numpy()),
-                        to=sid,
-                    )
+                    for sentence in sentences:
+                        sentence = preprocess_japanese_sentence(sentence)
+                        sentence = tf.constant(sentence)
+                        sentence = tokenizers.ja.tokenize(sentence).to_tensor()
+                        encoder_input = sentence
 
-                    for i in range(128):
-
-                        if not self.__is_client_connected(sid):
-                            break
-
-                        output = tf.transpose(output_array.stack())
-                        predictions = transformer_javi(
-                            [encoder_input, output], training=False
-                        )
-                        predictions = predictions[:, -1:, :]
-                        predicted_id = tf.argmax(predictions, axis=-1)
-                        output_array = output_array.write(i + 1, predicted_id[0])
+                        start_end = tokenizers.vi.tokenize([""])[0]
+                        start = start_end[0][tf.newaxis]
+                        end = start_end[1][tf.newaxis]
 
                         self.__socket.emit(
                             "translate",
-                            vi_tokenizer.decode(predicted_id[0].numpy()),
+                            tokenizers.vi.lookup(tf.reshape(start, (1, 1)))[0][0]
+                            .numpy()
+                            .decode("utf-8"),
                             to=sid,
                         )
 
-                        if predicted_id[0] == end:
-                            break
+                        output_array = tf.TensorArray(
+                            dtype=tf.int64, size=0, dynamic_size=True
+                        )
+                        output_array = output_array.write(0, start)
+
+                        for i in tf.range(64):
+                            output = tf.transpose(output_array.stack())
+                            predictions = javi_transformer(
+                                [encoder_input, output], training=False
+                            )
+                            predictions = predictions[:, -1:, :]
+                            predicted_id = tf.argmax(predictions, axis=-1)
+                            output_array = output_array.write(i + 1, predicted_id[0])
+
+                            self.__socket.emit(
+                                "translate",
+                                tokenizers.vi.lookup(tf.reshape(predicted_id, (1, 1)))[
+                                    0
+                                ][0]
+                                .numpy()
+                                .decode("utf-8"),
+                                to=sid,
+                            )
+
+                            if predicted_id == end:
+                                break
+
+                            if not self.__is_client_connected(sid):
+                                break
+
+                        self.__socket.emit(
+                            "translate",
+                            tokenizers.vi.lookup(tf.reshape(end, (1, 1)))[0][0]
+                            .numpy()
+                            .decode("utf-8"),
+                            to=sid,
+                        )
+
+                        output = tf.transpose(output_array.stack())
+                        text = tokenizers.vi.detokenize(output)[0]
                 case "vija":
-                    encoder_input = tf.expand_dims(
-                        tf.cast(
-                            vi_tokenizer(preprocess_vi(content))["input_ids"], tf.int64
-                        ),
-                        axis=0,
-                    )
-                    start_end = vi_tokenizer("")["input_ids"]
-                    start = tf.expand_dims(tf.cast(start_end[0], tf.int64), axis=0)
-                    end = tf.expand_dims(tf.cast(start_end[1], tf.int64), axis=0)
-                    output_array = tf.TensorArray(
-                        dtype=tf.int64, size=0, dynamic_size=True
-                    )
-                    output_array = output_array.write(0, start)
+                    sentences = split_vietnamese_sentence(content)
 
-                    self.__socket.emit(
-                        "translate",
-                        ja_tokenizer.decode(start.numpy()),
-                        to=sid,
-                    )
+                    for sentence in sentences:
+                        sentence = preprocess_vietnamese_sentece(sentence)
+                        sentence = tf.constant(sentence)
+                        sentence = tokenizers.vi.tokenize(sentence).to_tensor()
+                        encoder_input = sentence
 
-                    for i in range(128):
-
-                        if not self.__is_client_connected(sid):
-                            break
-
-                        output = tf.transpose(output_array.stack())
-                        predictions = transformer_vija(
-                            [encoder_input, output], training=False
-                        )
-                        predictions = predictions[:, -1:, :]
-                        predicted_id = tf.argmax(predictions, axis=-1)
-                        output_array = output_array.write(i + 1, predicted_id[0])
+                        start_end = tokenizers.ja.tokenize([""])[0]
+                        start = start_end[0][tf.newaxis]
+                        end = start_end[1][tf.newaxis]
 
                         self.__socket.emit(
                             "translate",
-                            ja_tokenizer.decode(predicted_id[0].numpy()),
+                            tokenizers.ja.lookup(tf.reshape(start, (1, 1)))[0][0]
+                            .numpy()
+                            .decode("utf-8"),
                             to=sid,
                         )
 
-                        if predicted_id[0] == end:
-                            break
+                        output_array = tf.TensorArray(
+                            dtype=tf.int64, size=0, dynamic_size=True
+                        )
+                        output_array = output_array.write(0, start)
+
+                        for i in tf.range(64):
+                            output = tf.transpose(output_array.stack())
+                            predictions = vija_transformer(
+                                [encoder_input, output], training=False
+                            )
+                            predictions = predictions[:, -1:, :]
+                            predicted_id = tf.argmax(predictions, axis=-1)
+                            output_array = output_array.write(i + 1, predicted_id[0])
+
+                            self.__socket.emit(
+                                "translate",
+                                tokenizers.ja.lookup(tf.reshape(predicted_id, (1, 1)))[
+                                    0
+                                ][0]
+                                .numpy()
+                                .decode("utf-8"),
+                                to=sid,
+                            )
+
+                            if predicted_id == end:
+                                break
+
+                            if not self.__is_client_connected(sid):
+                                break
+
+                        self.__socket.emit(
+                            "translate",
+                            tokenizers.ja.lookup(tf.reshape(end, (1, 1)))[0][0]
+                            .numpy()
+                            .decode("utf-8"),
+                            to=sid,
+                        )
+
+                        output = tf.transpose(output_array.stack())
+                        text = tokenizers.ja.detokenize(output)[0]
 
     def start(self):
         worker = threading.Thread(target=self.__translate_worker)

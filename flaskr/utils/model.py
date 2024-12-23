@@ -1,70 +1,10 @@
-import unicodedata
-import re
-
-
-def preprocess_ja(text):
-    text = text.replace("……", "…")
-    text = text.replace("─", "ー")
-    text = unicodedata.normalize("NFKC", text)
-    text = re.sub(r"(\d[\d,\.]*)", r"#\1#", text)
-    text = re.sub(
-        r"([０-９！＂＃＄％＆＇（）＊＋，－．／：；＜＝＞？＠［＼］＾＿｀｛｜｝～、。.！？「」『』（）【】〔〕〈〉《》〘〙〚〛〝〟・゠＝…ー〜ー々〆〇〻])",
-        r" \1 ",
-        text,
-    ).strip()
-    text = re.sub(
-        r"([0-9!\"#$%&\'()*+,\-./:;<=>?@[\\\]^_`{|}~…–—“”‘’«»])", r" \1 ", text
-    ).strip()
-    text = re.sub(r"\s+", " ", text)
-
-    return text.lower()
-
-
-from transformers import AutoTokenizer
-
-ja_tokenizer = AutoTokenizer.from_pretrained("cl-tohoku/bert-base-japanese")
-
-import py_vncorenlp
-
-rdrsegmenter = py_vncorenlp.VnCoreNLP(
-    annotators=["wseg"], save_dir="D:/Project/main_py/javi-dict/VnCoreNLP"
-)
-
-
-def preprocess_vi(text):
-    text = text.replace("……", "...")
-    text = text.replace("…", "...")
-    text = text.replace("─", "-")
-    text = text.replace("“", '"')
-    text = text.replace("”", '"')
-    text = text.replace("``", '"')
-    text = text.replace("''", '"')
-    text = unicodedata.normalize("NFKC", text)
-    text = re.sub(r"(\d[\d,\.]*)", r"#\1#", text)
-    text = re.sub(
-        r"([０-９！＂＃＄％＆＇（）＊＋，－．／：；＜＝＞？＠［＼］＾＿｀｛｜｝～、。.！？「」『』（）【】〔〕〈〉《》〘〙〚〛〝〟・゠＝…ー〜ー々〆〇〻])",
-        r" \1 ",
-        text,
-    ).strip()
-    text = re.sub(
-        r"([0-9!\"#$%&\'()*+,\-./:;<=>?@[\\\]^_`{|}~…–—“”‘’«»])", r" \1 ", text
-    ).strip()
-    text = re.sub(r"\s+", " ", text)
-
-    return " ".join(rdrsegmenter.word_segment(text.lower()))
-
-
-vi_tokenizer = AutoTokenizer.from_pretrained("vinai/phobert-base")
-
-vi_tokenizer.bos_token_id = 2
-vi_tokenizer.cls_token_id = 2
-vi_tokenizer.eos_token_id = 3
-vi_tokenizer.sep_token_id = 3
-vi_tokenizer.unk_token_id = 1
-vi_tokenizer.pad_token_id = 0
-
 import tensorflow as tf
+import tensorflow_text as text
 import numpy as np
+from underthesea import word_tokenize
+from fugashi import Tagger
+
+tagger = Tagger("-Owakati")
 
 
 def positional_encoding(length, depth):
@@ -328,46 +268,83 @@ dff = 2048
 num_heads = 8
 dropout_rate = 0.1
 
-source_data = np.random.randint(1, 30000, size=(64, 32))
-source_data[:, 0] = 2  # Setting the start token at the beginning
-source_tensor = tf.constant(source_data, dtype=tf.int64)
+tokenizers = tf.saved_model.load("D:/Project/main_py/javi-dict/tokenizers")
 
-target_data = np.random.randint(1, 30000, size=(64, 31))
-target_data[:, 0] = 2  # Setting the start token at the beginning
+javi_transformer = Transformer(
+    num_layers=num_layers,
+    d_model=d_model,
+    num_heads=num_heads,
+    dff=dff,
+    input_vocab_size=int(tokenizers.ja.get_vocab_size().numpy()),
+    target_vocab_size=int(tokenizers.vi.get_vocab_size().numpy()),
+    dropout_rate=dropout_rate,
+)
+vija_transformer = Transformer(
+    num_layers=num_layers,
+    d_model=d_model,
+    num_heads=num_heads,
+    dff=dff,
+    input_vocab_size=int(tokenizers.vi.get_vocab_size().numpy()),
+    target_vocab_size=int(tokenizers.ja.get_vocab_size().numpy()),
+    dropout_rate=dropout_rate,
+)
+
+source_data = np.random.randint(1, 32000, size=(64, 64))
+source_tensor = tf.constant(source_data, dtype=tf.int64)
+target_data = np.random.randint(1, 32000, size=(64, 64))
 target_tensor = tf.constant(target_data, dtype=tf.int64)
 
-transformer_javi = Transformer(
-    num_layers=num_layers,
-    d_model=d_model,
-    num_heads=num_heads,
-    dff=dff,
-    input_vocab_size=ja_tokenizer.vocab_size,
-    target_vocab_size=vi_tokenizer.vocab_size,
-    dropout_rate=dropout_rate,
+javi_transformer((source_tensor, target_tensor))
+vija_transformer((source_tensor, target_tensor))
+
+javi_transformer.load_weights(
+    "D:/Project/main_py/javi-dict/modelWeights/javi_transformer_weights.h5"
+)
+vija_transformer.load_weights(
+    "D:/Project/main_py/javi-dict/modelWeights/vija_transformer_weights.h5"
 )
 
-output_javi = transformer_javi((source_tensor, target_tensor))
+import unicodedata
+import re
 
-transformer_javi.summary()
 
-transformer_javi.load_weights(
-    "D:/Project/main_py/javi-dict/modelWeights/my_model_v3_23_weights.h5"
-)
+def preprocess_japanese_sentence(sentence):
+    sentence = unicodedata.normalize("NFKC", sentence)
 
-transformer_vija = Transformer(
-    num_layers=num_layers,
-    d_model=d_model,
-    num_heads=num_heads,
-    dff=dff,
-    input_vocab_size=vi_tokenizer.vocab_size,
-    target_vocab_size=ja_tokenizer.vocab_size,
-    dropout_rate=dropout_rate,
-)
+    sentence = re.sub(r"[^\w\sぁ-んァ-ン一-龥々。、「」『』?!]", "", sentence)
+    sentence = re.sub(r"\s+", " ", sentence)
 
-output_vija = transformer_vija((source_tensor, target_tensor))
+    sentence = sentence.lower()
 
-transformer_vija.summary()
+    return tagger.parse(sentence.strip())
 
-transformer_vija.load_weights(
-    "D:/Project/main_py/javi-dict/modelWeights/my_model_v1_12_weights.h5"
-)
+
+def preprocess_vietnamese_sentece(sentence):
+    sentence = unicodedata.normalize("NFC", sentence)
+
+    sentence = sentence.replace("`` ", '"')
+    sentence = sentence.replace(" ''", '"')
+    sentence = sentence.replace("``", '"')
+    sentence = sentence.replace("''", '"')
+    sentence = sentence.replace("“", '"')
+    sentence = sentence.replace("”", '"')
+    sentence = re.sub(r"[^\w\s,.!?\"-]", "", sentence)
+    sentence = re.sub(r"\s+", " ", sentence)
+
+    sentence = sentence.lower()
+
+    return word_tokenize(sentence.strip(), format="text")
+
+
+def split_japanese_sentence(content):
+    sentence_endings = re.compile(r"(?<=[。！？])")
+    sentences = sentence_endings.split(content)
+    sentences = [sentence.strip() for sentence in sentences if sentence.strip()]
+    return sentences
+
+
+def split_vietnamese_sentence(content):
+    sentence_endings = re.compile(r"(?<=[\.!?])\s+")
+    sentences = sentence_endings.split(content)
+    sentences = [sentence.strip() for sentence in sentences if sentence.strip()]
+    return sentences
