@@ -4,11 +4,6 @@ def create_app():
 
     app = Flask(__name__, instance_relative_config=True)
 
-    from dotenv import load_dotenv, dotenv_values
-
-    load_dotenv()
-    app.config.from_mapping(dotenv_values())
-
     # json converter
     from flaskr.utils.json_helper import CustomJSONProvider
 
@@ -41,14 +36,5 @@ def create_app():
 
     TranslateManager.get_instance().init_app(app)
     TranslateManager.get_instance().start()
-
-    import cloudinary
-
-    cloudinary.config(
-        cloud_name=app.config.get("CLOUD_NAME"),
-        api_key=app.config.get("API_KEY"),
-        api_secret=app.config.get("API_SECRET"),
-        secure=True,
-    )
-
+    
     return app

@@ -3,6 +3,7 @@ import tensorflow_text as text
 import numpy as np
 from underthesea import word_tokenize
 from fugashi import Tagger
+import os
 
 tagger = Tagger("-Owakati")
 
@@ -268,7 +269,7 @@ dff = 2048
 num_heads = 8
 dropout_rate = 0.1
 
-tokenizers = tf.saved_model.load("D:/Project/main_py/javi-dict/tokenizers")
+tokenizers = tf.saved_model.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'tokenizers'))
 
 javi_transformer = Transformer(
     num_layers=num_layers,
@@ -289,19 +290,19 @@ vija_transformer = Transformer(
     dropout_rate=dropout_rate,
 )
 
-source_data = np.random.randint(1, 32000, size=(64, 64))
+source_data = np.random.randint(1, 30000, size=(64, 32))
 source_tensor = tf.constant(source_data, dtype=tf.int64)
-target_data = np.random.randint(1, 32000, size=(64, 64))
+target_data = np.random.randint(1, 30000, size=(64, 32))
 target_tensor = tf.constant(target_data, dtype=tf.int64)
 
 javi_transformer((source_tensor, target_tensor))
 vija_transformer((source_tensor, target_tensor))
 
 javi_transformer.load_weights(
-    "D:/Project/main_py/javi-dict/modelWeights/javi_transformer_weights.h5"
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'model', 'javi_transformer_weights.h5')
 )
 vija_transformer.load_weights(
-    "D:/Project/main_py/javi-dict/modelWeights/vija_transformer_weights.h5"
+    os.path.join(os.path.dirname(os.path.abspath(__file__)), 'model', 'vija_transformer_weights.h5')
 )
 
 import unicodedata

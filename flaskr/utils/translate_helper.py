@@ -110,6 +110,8 @@ class TranslateManager:
                     for sentence in sentences:
                         sentence = preprocess_japanese_sentence(sentence)
                         sentence = tf.constant(sentence)
+                        if len(sentence.shape) == 0:
+                            sentence = sentence[tf.newaxis]
                         sentence = tokenizers.ja.tokenize(sentence).to_tensor()
                         encoder_input = sentence
 
@@ -119,9 +121,7 @@ class TranslateManager:
 
                         self.__socket.emit(
                             "translate",
-                            tokenizers.vi.lookup(tf.reshape(start, (1, 1)))[0][0]
-                            .numpy()
-                            .decode("utf-8"),
+                            "[START]",
                             to=sid,
                         )
 
@@ -145,7 +145,7 @@ class TranslateManager:
                                     0
                                 ][0]
                                 .numpy()
-                                .decode("utf-8"),
+                                .decode("utf-8") + " ",
                                 to=sid,
                             )
 
@@ -157,9 +157,7 @@ class TranslateManager:
 
                         self.__socket.emit(
                             "translate",
-                            tokenizers.vi.lookup(tf.reshape(end, (1, 1)))[0][0]
-                            .numpy()
-                            .decode("utf-8"),
+                            "[END]",
                             to=sid,
                         )
 
@@ -171,6 +169,8 @@ class TranslateManager:
                     for sentence in sentences:
                         sentence = preprocess_vietnamese_sentece(sentence)
                         sentence = tf.constant(sentence)
+                        if len(sentence.shape) == 0:
+                            sentence = sentence[tf.newaxis]
                         sentence = tokenizers.vi.tokenize(sentence).to_tensor()
                         encoder_input = sentence
 
@@ -180,9 +180,7 @@ class TranslateManager:
 
                         self.__socket.emit(
                             "translate",
-                            tokenizers.ja.lookup(tf.reshape(start, (1, 1)))[0][0]
-                            .numpy()
-                            .decode("utf-8"),
+                            "[START]",
                             to=sid,
                         )
 
@@ -218,9 +216,7 @@ class TranslateManager:
 
                         self.__socket.emit(
                             "translate",
-                            tokenizers.ja.lookup(tf.reshape(end, (1, 1)))[0][0]
-                            .numpy()
-                            .decode("utf-8"),
+                            "[END]",
                             to=sid,
                         )
 

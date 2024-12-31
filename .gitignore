@@ -1,5 +1,3 @@
-VnCoreNLP
-modelWeights
+model
 .venv
 __pycache__
-.env

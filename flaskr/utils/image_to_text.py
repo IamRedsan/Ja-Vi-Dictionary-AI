@@ -1,8 +1,6 @@
 import pytesseract
 import cv2
 
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
-
 
 def image_to_text(image):
     # Grayscale, Gaussian blur, Otsu's threshold
@@ -17,8 +15,5 @@ def image_to_text(image):
 
     # Perform text extraction
     data = pytesseract.image_to_string(invert, lang="jpn", config="--psm 6")
-    cv2.imshow("thresh", thresh)
-    cv2.imshow("opening", opening)
-    cv2.imshow("invert", invert)
 
     return data

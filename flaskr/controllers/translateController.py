@@ -44,5 +44,5 @@ def imageToText():
         raise BadRequestError("Failed to decode image")
 
     text = image_to_text(image)
-
-    return {"text": text}
+    
+    return {"text": text.strip()}
